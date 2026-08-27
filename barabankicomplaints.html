@@ -568,15 +568,21 @@ function escapeHTML(value) {
 
 function formatPON(user) {
     const raw = user?.raw || {};
-    return (
-        user?.pon ||
-        raw.PON ||
-        raw.pon ||
-        raw.Pon ||
-        raw.port_name ||
-        raw['PON Name'] ||
-        'N/A'
-    );
+    const pon = user?.pon || raw.PON || raw.pon || raw.Pon || raw.port_name || raw['PON Name'] || '';
+    const oltIp = user?.oltIp || raw['OLT IP'] || raw.oltIp || raw.olt_ip || '';
+
+    const trimmedPon = String(pon).trim();
+    if (/^UNDEFINED-00\.00P\d+$/i.test(trimmedPon)) return 'N/A';
+
+    const match = trimmedPon.match(/^([A-Z0-9.-]+)P(\d+)$/i);
+    if (!match) return pon || 'N/A';
+
+    const oltParts = String(oltIp || '').split('.');
+    const oltLabel = oltParts.length >= 2
+        ? `OLT:${oltParts[oltParts.length - 2]}.${oltParts[oltParts.length - 1]}`
+        : match[1].toUpperCase();
+
+    return `${oltLabel}P${parseInt(match[2], 10)}`;
 }
 
 function formatLastSeen(value) {
@@ -795,7 +801,6 @@ function render(users) {
             <th>Status</th>
             ${showType ? '<th>Type</th>' : ''}
             <th>PON</th>
-            <th>Last Seen</th>
             ${showEvent ? '<th>Event</th>' : ''}
             <th>User ID</th>
         </tr></thead><tbody>`;
@@ -826,11 +831,6 @@ function render(users) {
             cols.push(`<td>${typeBadge(u.type)}</td>`);
         }
         cols.push(`<td><code>${escapeHTML(formatPON(u))}</code></td>`);
-        cols.push(`<td>${escapeHTML(
-            u.raw?.status === 'DOWN'
-                ? formatLastSeen(u.raw?.down_event_timestamp)
-                : formatLastSeen(u.raw?.['Last Seen'])
-        )}</td>`);
         if (showEvent) {
             cols.push(`<td>${escapeHTML(eventValue)}</td>`);
         }
